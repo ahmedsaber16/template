@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tumor Detection</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #222;
+            color: #fff;
+        }
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background-color: #111;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            box-sizing: border-box;
+            transition: box-shadow 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: fadeIn 1s ease-out;
+        }
+        h1 {
+            margin-bottom: 20px;
+            text-align: center;
+            color: #00adb5;
+            font-size: 36px;
+            animation: slideInDown 1s ease-out;
+        }
+        .upload-form {
+            text-align: center;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        .upload-form input[type=file] {
+            margin: 20px 0;
+            padding: 10px;
+            border: 2px solid #00adb5;
+            border-radius: 4px;
+            background-color: #222;
+            font-size: 16px;
+            color: #fff;
+            cursor: pointer;
+            transition: border-color 0.3s;
+            width: calc(50% - 20px);
+        }
+        .upload-form input[type=file]:hover {
+            border-color: #eee;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+        }
+        .button {
+            margin: 0 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #00adb5;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #393e46;
+        }
+        .image-container {
+            margin-top: 20px;
+            text-align: center;
+            display: none;
+            width: 48%;
+            animation: slideInUp 1s ease-out;
+        }
+        .image-container.show {
+            display: block;
+        }
+        .image-preview {
+            max-width: 100%;
+            max-height: 400px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s;
+            margin-bottom: 20px;
+        }
+        .image-preview:hover {
+            transform: scale(1.05);
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 30px;
+            text-align: center;
+            font-family: 'Times New Roman', Times, serif;
+            width: 100%;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes slideInDown {
+            from {
+                transform: translateY(-50px);
+            }
+            to {
+                transform: translateY(0);
+            }
+        }
+        @keyframes slideInUp {
+            from {
+                transform: translateY(50px);
+            }
+            to {
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Brain Tumor Detection and Segmentation</h1>
+
+        <form class="upload-form" id="upload-form" enctype="multipart/form-data">
+            <input type="file" id="file-input" name="file" accept="image/*">
+            <div class="button-container">
+                <button type="button" class="button" onclick="predict()">Predict</button>
+                <button type="button" class="button" id="segment-button" style="display: none;" onclick="segment()">Segment</button>
+            </div>
+        </form>
+
+        <div class="image-container" id="selected-image-container">
+            <h2>Selected Image</h2>
+            <img id="selected-image" class="image-preview" src="#" alt="Uploaded Image">
+        </div>
+
+        <div class="image-container" id="mri-with-mask-container">
+            <h2>MRI with Mask</h2>
+            <img id="mri-with-mask" class="image-preview" src="#" alt="Image Selected">
+        </div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        function predict() {
+            var formData = new FormData(document.getElementById("upload-form"));
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/predict", true);
+            xhr.onload = function() {
+                if (xhr.status == 200) {
+                    var response = JSON.parse(xhr.responseText);
+                    document.getElementById("result").innerHTML = "Predicted tumor type: " + response.result;
+                    if (response.result !== "no_tumor") {
+                        document.getElementById("segment-button").style.display = "inline-block";
+                    } else {
+                        document.getElementById("segment-button").style.display = "none";
+                    }
+                } else {
+                    alert("Error: " + xhr.statusText);
+                }
+            };
+            xhr.send(formData);
+        }
+
+        function segment() {
+            var formData = new FormData(document.getElementById("upload-form"));
+            var xhr = new XMLHttpRequest();
+            xhr.open("POST", "/segment", true);
+            xhr.responseType = "json";  
+            xhr.onload = function() {
+                if (xhr.status == 200) {
+                    var response = xhr.response;
+                    if (response.has_mask) {
+                        document.getElementById("selected-image").src = "data:image/jpeg;base64," + response.selected_image;
+                        document.getElementById("mri-with-mask").src = "data:image/jpeg;base64," + response.mri_with_mask;
+                        document.getElementById("selected-image-container").classList.add("show");
+                        document.getElementById("mri-with-mask-container").classList.add("show");
+                        document.getElementById("result").innerHTML = "";
+                    } else {
+                        document.getElementById("result").innerHTML = "No mask found in the image.";
+                    }
+                } else {
+                    alert("Error: " + xhr.statusText);
+                }
+            };
+            xhr.send(formData);
+        }
+
+        document.getElementById("file-input").addEventListener("change", function(event) {
+            var file = event.target.files[0];
+            if (file) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById("selected-image").src = e.target.result;
+                    document.getElementById("selected-image-container").classList.add("show");
+                    // Clear the result and MRI with mask
+                    document.getElementById("result").innerHTML = "";
+                    document.getElementById("mri-with-mask").src = "";
+                    document.getElementById("mri-with-mask-container").classList.remove("show");
+                    // Hide the segment button
+                    document.getElementById("segment-button").style.display = "none";
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    </script>
+</body>
+</html>
